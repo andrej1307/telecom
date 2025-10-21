@@ -5,21 +5,25 @@ import ru.sas.telecom.exception.StdpException;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.net.Socket;
+import java.text.SimpleDateFormat;
+import java.time.LocalDateTime;
+import java.util.Date;
 import java.util.Properties;
 
 public class StdpConnection extends Thread {
     private static final int STDP_ID_ABON_LENGTH = 13;
 
-    protected Properties connectionProperties;
-    protected Socket sock;
-    protected DataOutputStream output;	// поток для передачи информации
-    protected DataInputStream input;    // поток для приема информации
+    private Properties connectionProperties;
+    private Socket sock;
+    private DataOutputStream output;	// поток для передачи информации
+    private DataInputStream input;    // поток для приема информации
 
-    protected boolean inAction = false;	// признак выполнения цикла обмена данными
-    protected boolean isConnected = false;
+    private boolean inAction = false;	// признак выполнения цикла обмена данными
+    private boolean isConnected = false;
 
-    String serverResponseText;
-    String lastErrorText;
+    private int msgIdCount = 0;
+    private String serverResponseText;
+    private String lastErrorText;
 
     public StdpConnection(Properties properties) {
         super();
@@ -109,11 +113,12 @@ public class StdpConnection extends Thread {
                         break;
                     default:
                 }
-
+                // sleep(100);
             }
             catch (Exception e) {
-                System.out.println(e.getMessage());
+                throw new StdpException(e.getMessage());
             }
+
         }
     }
 
@@ -168,11 +173,9 @@ public class StdpConnection extends Thread {
                 + "0000";
 
         try {
-            // Формируем массив байт в кодировке ДКОИ
-            byte[] bytes = tmp.getBytes("1025");
-            sendBytes(bytes, 47);
+            sendBytes(tmp.getBytes("1025"), 47);
         } catch (Exception e) {
-            lastErrorText = e.toString();
+            lastErrorText = e.getMessage();
         }
     }
 
@@ -185,9 +188,23 @@ public class StdpConnection extends Thread {
         try {
             output.write(bytes, 0, num);
         } catch (Exception e) {
-            lastErrorText = " Ошибка при передаче данных. Системное исключение.\n"
+            lastErrorText = " Ошибка при передаче данных. Системное исключение: "
                     + e.getMessage();
         }
+    }
+
+    /**
+     * Функция формирования внутреннего идентификатора сообщений
+     * @return - строка идентификатора длиной 12 символов
+     */
+    synchronized private String getNextMsgID() {
+        SimpleDateFormat sdf = new SimpleDateFormat("MMddHHmmss");
+        if(msgIdCount<99) {
+            msgIdCount++;
+        } else {
+            msgIdCount=0;
+        }
+        return String.format("%s%02d", sdf.format(new Date()), msgIdCount);
     }
 
 }
